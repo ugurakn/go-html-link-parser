@@ -28,15 +28,12 @@ func Parse(r io.Reader) ([]Link, error) {
 		return nil, fmt.Errorf("error parsing html: %s", err)
 	}
 
-	links := make([]Link, 0)
+	linkNodes := GetLinkNodes(doc)
 
-	parseNode(doc, &links)
-
-	return links, nil
-}
-
-func parseNode(n *html.Node, links *[]Link) {
-	if n.Type == html.ElementNode && n.Data == "a" {
+	// extract href and text from linkNodes
+	// build links out of them
+	var links []Link
+	for _, n := range linkNodes {
 		l := Link{}
 		for _, attr := range n.Attr {
 			if attr.Key == "href" {
@@ -44,50 +41,42 @@ func parseNode(n *html.Node, links *[]Link) {
 				break
 			}
 		}
-		// search all descendants of this a tag to find all text nodes
-		// and concat them in t
-		var t string
-		extractText(n, &t)
+		// search all descendants of this node to
+		// find all text nodes and concat them in t
+		t := extractText(n)
 		// replace all \n, \t and extra whitespace
 		re := regexp.MustCompile(`\s+`)
 		t = re.ReplaceAllString(t, " ")
 		t = strings.TrimSpace(t)
 		l.Text = t
-		*links = append(*links, l)
-		return
+		links = append(links, l)
 	}
 
-	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		parseNode(c, links)
+	return links, nil
+}
+
+func GetLinkNodes(n *html.Node) []*html.Node {
+	if n.Type == html.ElementNode && n.Data == "a" {
+		return []*html.Node{n}
 	}
+
+	var ret []*html.Node
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		ret = append(ret, GetLinkNodes(c)...)
+	}
+	return ret
 }
 
 // DFS all descendants of n to find all text nodes
 // and concat them in t
-func extractText(n *html.Node, t *string) {
+func extractText(n *html.Node) string {
 	if n.Type == html.TextNode {
-		*t += n.Data
+		return n.Data
 	}
 
+	var ret string
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		extractText(c, t)
+		ret += extractText(c)
 	}
+	return ret
 }
-
-// func ParseHTML(r io.Reader) (*html.Node, error) {
-// 	doc, err := html.Parse(r)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("error parsing html: %s", err)
-// 	}
-
-// 	return doc, nil
-// }
-
-// // PrintNode prints the node and all its descendants
-// func PrintNode(n *html.Node, padding string) {
-// 	fmt.Printf("%s%s\n", padding, n.Data)
-
-// 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-// 		PrintNode(c, padding+"  ")
-// 	}
-// }
