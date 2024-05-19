@@ -3,7 +3,6 @@ package link
 import (
 	"fmt"
 	"io"
-	"regexp"
 	"strings"
 
 	"golang.org/x/net/html"
@@ -40,6 +39,7 @@ func Parse(r io.Reader) ([]Link, error) {
 	return links, nil
 }
 
+// build and return a Link from the given link tag.
 func buildLink(n *html.Node) Link {
 	var l Link
 	for _, attr := range n.Attr {
@@ -48,17 +48,12 @@ func buildLink(n *html.Node) Link {
 			break
 		}
 	}
-
-	t := extractText(n)
-	// remove all \n, \t etc and extra whitespace
-	re := regexp.MustCompile(`\s+`)
-	t = re.ReplaceAllString(t, " ")
-	t = strings.TrimSpace(t)
-	l.Text = t
+	l.Text = extractText(n)
 
 	return l
 }
 
+// find and return all the link nodes in n
 func getLinkNodes(n *html.Node) []*html.Node {
 	if n.Type == html.ElementNode && n.Data == "a" {
 		return []*html.Node{n}
@@ -68,11 +63,12 @@ func getLinkNodes(n *html.Node) []*html.Node {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		ret = append(ret, getLinkNodes(c)...)
 	}
+
 	return ret
 }
 
-// DFS all descendants of n to find all text nodes
-// and concat them in t
+// DFS all descendants of n (a link tag) to find all text nodes.
+// Concat and return as a single string
 func extractText(n *html.Node) string {
 	if n.Type == html.TextNode {
 		return n.Data
@@ -82,5 +78,6 @@ func extractText(n *html.Node) string {
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
 		ret += extractText(c)
 	}
-	return ret
+
+	return strings.Join(strings.Fields(ret), " ")
 }
